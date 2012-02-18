@@ -45,7 +45,8 @@ module FriendlyId
       value = sluggable.send pkey
       scope = sluggable.class.unscoped.where("#{column} = ? OR #{column} LIKE ?", normalized, wildcard)
       scope = scope.where("#{pkey} <> ?", value) unless sluggable.new_record?
-      scope = scope.order("LENGTH(#{column}) DESC, #{column} DESC")
+      # scope = scope.order("LENGTH(#{column}) DESC, #{column} DESC")
+      scope = scope.order("LEN(#{column}) DESC, #{column} DESC")
     end
 
     def friendly_id_config
