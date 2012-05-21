@@ -1,4 +1,9 @@
 require "friendly_id/migration"
+require "globalize3"
+
+class TranslatedArticle < ActiveRecord::Base
+  translates :slug, :title
+end
 
 module FriendlyId
   module Test
@@ -9,6 +14,7 @@ module FriendlyId
           tables.each do |name|
             drop_table name
           end
+          TranslatedArticle.drop_translation_table!
         end
 
         def up
@@ -30,7 +36,9 @@ module FriendlyId
 
           # This will be used to test scopes
           add_column :novels, :novelist_id, :integer
+          add_column :novels, :publisher_id, :integer
           remove_index :novels, :slug
+          add_index :novels, [:slug, :publisher_id, :novelist_id], :unique => true
 
           # This will be used to test column name quoting
           add_column :journalists, "strange name", :string
@@ -43,17 +51,20 @@ module FriendlyId
           add_column :journalists, "slug_es", :string
           add_column :journalists, "slug_de", :string
 
+          # This will be used to test globalize translations
+          TranslatedArticle.create_translation_table! :slug => :string, :title => :string
+
           @done = true
         end
 
         private
 
         def slugged_tables
-          ["journalists", "articles", "novelists", "novels", "manuals"]
+          ["journalists", "articles", "novelists", "novels", "manuals", "translated_articles"]
         end
 
         def simple_tables
-          ["authors", "books"]
+          ["authors", "books", "publishers"]
         end
 
         def tables

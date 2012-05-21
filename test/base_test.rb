@@ -1,10 +1,25 @@
-require File.expand_path("../helper.rb", __FILE__)
+require "helper"
 
 class CoreTest < MiniTest::Unit::TestCase
   include FriendlyId::Test
 
+  test "friendly_id can be added using 'extend'" do
+    klass = Class.new(ActiveRecord::Base) do
+      extend FriendlyId
+    end
+    assert klass.respond_to? :friendly_id
+  end
+
+  test "friendly_id can be added using 'include'" do
+    klass = Class.new(ActiveRecord::Base) do
+      include FriendlyId
+    end
+    assert klass.respond_to? :friendly_id
+  end
+
   test "friendly_id should accept a base and a hash" do
     klass = Class.new(ActiveRecord::Base) do
+      self.abstract_class = true
       extend FriendlyId
       friendly_id :foo, :use => :slugged, :slug_column => :bar
     end
@@ -16,6 +31,7 @@ class CoreTest < MiniTest::Unit::TestCase
 
   test "friendly_id should accept a block" do
     klass = Class.new(ActiveRecord::Base) do
+      self.abstract_class = true
       extend FriendlyId
       friendly_id :foo do |config|
         config.use :slugged
@@ -30,6 +46,7 @@ class CoreTest < MiniTest::Unit::TestCase
 
   test "the block passed to friendly_id should be evaluated before arguments" do
     klass = Class.new(ActiveRecord::Base) do
+      self.abstract_class = true
       extend FriendlyId
       friendly_id :foo do |config|
         config.base = :bar
@@ -44,6 +61,7 @@ class CoreTest < MiniTest::Unit::TestCase
         config.base = :foo
       end
       klass = Class.new(ActiveRecord::Base) do
+        self.abstract_class = true
         extend FriendlyId
       end
       assert_equal :foo, klass.friendly_id_config.base

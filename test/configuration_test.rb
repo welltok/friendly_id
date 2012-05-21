@@ -1,11 +1,13 @@
-require File.expand_path("../helper", __FILE__)
+require "helper"
 
 class ConfigurationTest < MiniTest::Unit::TestCase
 
   include FriendlyId::Test
 
   def setup
-    @model_class = Class.new(ActiveRecord::Base)
+    @model_class = Class.new(ActiveRecord::Base) do
+      self.abstract_class = true
+    end
   end
 
   test "should set model class on initialization" do
@@ -22,6 +24,25 @@ class ConfigurationTest < MiniTest::Unit::TestCase
     assert_raises NoMethodError do
       FriendlyId::Configuration.new @model_class, :foo => "bar"
     end
+  end
+
+  test "#use should accept a name that resolves to a module" do
+    refute @model_class < FriendlyId::Slugged
+    @model_class.class_eval do
+      extend FriendlyId
+      friendly_id :hello, :use => :slugged
+    end
+    assert @model_class < FriendlyId::Slugged
+  end
+
+  test "#use should accept a module" do
+    my_module = Module.new
+    refute @model_class < my_module
+    @model_class.class_eval do
+      extend FriendlyId
+      friendly_id :hello, :use => my_module
+    end
+    assert @model_class < my_module
   end
 
 end

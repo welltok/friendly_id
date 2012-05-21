@@ -1,6 +1,6 @@
-require File.expand_path("../helper.rb", __FILE__)
+require "helper"
 
-class I18nTest < MiniTest::Unit::TestCase
+class SimpleI18nTest < MiniTest::Unit::TestCase
   include FriendlyId::Test
 
   class Journalist < ActiveRecord::Base
@@ -8,7 +8,7 @@ class I18nTest < MiniTest::Unit::TestCase
     friendly_id :name, :use => :simple_i18n
   end
 
-  test "friendly_id should return a the current locale's slug" do
+  test "friendly_id should return the current locale's slug" do
     journalist = Journalist.new(:name => "John Doe")
     journalist.slug_es = "juan-fulano"
     journalist.valid?
@@ -58,6 +58,17 @@ class I18nTest < MiniTest::Unit::TestCase
     end
   end
 
+  test "set friendly_id should fall back default locale when none is given" do
+    transaction do
+      journalist = I18n.with_locale(:es) do
+        Journalist.create!(:name => "Juan Fulano")
+      end
+      journalist.set_friendly_id("John Doe")
+      journalist.save!
+      assert_equal "john-doe", journalist.slug_en
+    end
+  end
+
   test "should sequence localized slugs" do
     transaction do
       journalist = Journalist.create!(:name => "John Smith")
@@ -100,6 +111,7 @@ class I18nTest < MiniTest::Unit::TestCase
 
     test "should add locale to non-default slug column and non-default locale" do
       model_class = Class.new(ActiveRecord::Base) do
+        self.abstract_class = true
         extend FriendlyId
         friendly_id :name, :use => :simple_i18n, :slug_column => :foo
       end

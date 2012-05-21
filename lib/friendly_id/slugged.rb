@@ -160,6 +160,21 @@ This functionality was in fact taken from earlier versions of FriendlyId.
 
 ==== Gotchas: Common Problems
 
+===== Slugs That Begin With Numbers
+
+Ruby's `to_i` function casts strings to integers in such a way that +23abc.to_i+
+returns 23. Because FriendlyId falls back to finding by numeric id, this means
+that if you attempt to find a record with a non-existant slug, and that slug
+begins with a number, your find will probably return the wrong record.
+
+There are two fairly simple ways to avoid this:
+
+* Use validations to ensure that slugs don't begin with numbers.
+* Use explicit finders like +find_by_id+ to always find by the numeric id, or
+  +find_by_slug+ to always find using the friendly id.
+
+===== Concurrency Issues
+
 FriendlyId uses a before_validation callback to generate and set the slug. This
 means that if you create two model instances before saving them, it's possible
 they will generate the same slug, and the second save will fail.
@@ -168,13 +183,9 @@ This can happen in two fairly normal cases: the first, when a model using nested
 attributes creates more than one record for a model that uses friendly_id. The
 second, in concurrent code, either in threads or multiple processes.
 
-===== Nested Attributes
-
 To solve the nested attributes issue, I recommend simply avoiding them when
 creating more than one nested record for a model that uses FriendlyId. See {this
 Github issue}[https://github.com/norman/friendly_id/issues/185] for discussion.
-
-===== Concurrency
 
 To solve the concurrency issue, I recommend locking the model's table against
 inserts while when saving the record. See {this Github
@@ -186,13 +197,13 @@ issue}[https://github.com/norman/friendly_id/issues/180] for discussion.
     # Sets up behavior and configuration options for FriendlyId's slugging
     # feature.
     def self.included(model_class)
-      model_class.instance_eval do
-        friendly_id_config.class.send :include, Configuration
-        friendly_id_config.defaults[:slug_column]        ||= 'slug'
-        friendly_id_config.defaults[:sequence_separator] ||= '--'
-        friendly_id_config.slug_generator_class          ||= Class.new(SlugGenerator)
-        before_validation :set_slug
+      model_class.friendly_id_config.instance_eval do
+        self.class.send :include, Configuration
+        self.slug_generator_class     ||= Class.new(SlugGenerator)
+        defaults[:slug_column]        ||= 'slug'
+        defaults[:sequence_separator] ||= '--'
       end
+      model_class.before_validation :set_slug
     end
 
     # Process the given value to make it suitable for use as a slug.
@@ -241,10 +252,17 @@ issue}[https://github.com/norman/friendly_id/issues/180] for discussion.
     def should_generate_new_friendly_id?
       base       = send(friendly_id_config.base)
       slug_value = send(friendly_id_config.slug_column)
+
+      # If the slug base is nil, and the slug field is nil, then we're going to
+      # leave the slug column NULL.
       return false if base.nil? && slug_value.nil?
+      # Otherwise, if this is a new record, we're definitely going to try to
+      # create a new slug.
       return true if new_record?
       slug_base = normalize_friendly_id(base)
       separator = Regexp.escape friendly_id_config.sequence_separator
+      # If the slug base (without sequence) is different from either the current
+      # friendly id or the slug value, then we'll generate a new friendly_id.
       slug_base != (current_friendly_id || slug_value).try(:sub, /#{separator}[\d]*\z/, '')
     end
 

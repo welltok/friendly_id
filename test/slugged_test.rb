@@ -1,4 +1,4 @@
-require File.expand_path("../helper.rb", __FILE__)
+require "helper"
 
 class Journalist < ActiveRecord::Base
   extend FriendlyId
@@ -8,6 +8,15 @@ end
 class Article < ActiveRecord::Base
   extend FriendlyId
   friendly_id :name, :use => :slugged
+end
+
+class Novelist < ActiveRecord::Base
+  extend FriendlyId
+  friendly_id :name, :use => :slugged, :sequence_separator => '_'
+
+  def normalize_friendly_id(string)
+    super.gsub("-", "_")
+  end
 end
 
 class SluggedTest < MiniTest::Unit::TestCase
@@ -78,10 +87,13 @@ class SlugGeneratorTest < MiniTest::Unit::TestCase
   end
 
   test "should quote column names" do
-    model_class            = Class.new(ActiveRecord::Base)
-    model_class.table_name = "journalists"
-    model_class.extend FriendlyId
-    model_class.friendly_id :name, :use => :slugged, :slug_column => "strange name"
+    model_class = Class.new(ActiveRecord::Base) do
+      self.abstract_class = true
+      self.table_name = "journalists"
+      extend FriendlyId
+      friendly_id :name, :use => :slugged, :slug_column => "strange name"
+    end
+
     begin
       with_instance_of(model_class) {|record| assert model_class.find(record.friendly_id)}
     rescue ActiveRecord::StatementInvalid
@@ -106,6 +118,14 @@ class SlugGeneratorTest < MiniTest::Unit::TestCase
       assert_equal "peugeuot-206", record1.slug
       record2 = model_class.create! :name => "Peugeuot 206"
       assert_equal "peugeuot-206--2", record2.slug
+    end
+  end
+
+  test "should correctly sequence slugs with underscores" do
+    transaction do
+      record1 = Novelist.create! :name => 'wordsfail, buildings tumble'
+      record2 = Novelist.create! :name => 'word fail'
+      assert_equal 'word_fail', record2.slug
     end
   end
 
@@ -180,6 +200,26 @@ class SluggedRegressionsTest < MiniTest::Unit::TestCase
       end
     end
   end
+end
+
+class UnderscoreAsSequenceSeparatorRegressionTest < MiniTest::Unit::TestCase
+  include FriendlyId::Test
+
+  class Manual < ActiveRecord::Base
+    extend FriendlyId
+    friendly_id :name, :use => :slugged, :sequence_separator => "_"
+  end
+
+  test "should not create duplicate slugs" do
+    3.times do
+      begin
+        assert Manual.create! :name => "foo"
+      rescue
+        flunk "Tried to insert duplicate slug"
+      end
+    end
+  end
+
 end
 
 # https://github.com/norman/friendly_id/issues/148

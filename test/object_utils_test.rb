@@ -1,4 +1,4 @@
-require File.expand_path("../helper.rb", __FILE__)
+require "helper"
 
 
 class ObjectUtilsTest < MiniTest::Unit::TestCase
@@ -19,8 +19,10 @@ class ObjectUtilsTest < MiniTest::Unit::TestCase
   end
 
   test "ActiveRecord::Base instances should be unfriendly_ids" do
-    model_class = Class.new(ActiveRecord::Base)
-    model_class.table_name = "authors"
+    model_class = Class.new(ActiveRecord::Base) do
+      self.abstract_class = true
+      self.table_name = "authors"
+    end
     assert model_class.new.unfriendly_id?
   end
 end

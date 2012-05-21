@@ -12,10 +12,7 @@ module FriendlyId
 
     # Given a slug, get the next available slug in the sequence.
     def next
-      # Don't assume that the separator is unique within the slug
-      sequence = conflict.to_param.gsub(/^#{Regexp.quote(normalized)}(#{Regexp.quote(separator)})?/, '').to_i
-      next_sequence = sequence == 0 ? 2 : sequence.next
-      "#{normalized}#{separator}#{next_sequence}"
+      "#{normalized}#{separator}#{next_in_sequence}"
     end
 
     # Generate a new sequenced slug.
@@ -24,6 +21,19 @@ module FriendlyId
     end
 
     private
+
+    def next_in_sequence
+      last_in_sequence == 0 ? 2 : last_in_sequence.next
+    end
+
+    def last_in_sequence
+      @_last_in_sequence ||= extract_sequence_from_slug(conflict.to_param)
+    end
+
+    def extract_sequence_from_slug(slug)
+      # Don't assume that the separator is unique in the slug.
+      slug.gsub(/^#{Regexp.quote(normalized)}(#{Regexp.quote(separator)})?/, '').to_i
+    end
 
     def column
       sluggable.connection.quote_column_name friendly_id_config.slug_column
@@ -41,9 +51,14 @@ module FriendlyId
     end
 
     def conflicts
-      pkey  = sluggable.class.primary_key
+      sluggable_class = friendly_id_config.model_class.base_class
+
+      pkey  = sluggable_class.primary_key
       value = sluggable.send pkey
-      scope = sluggable.class.unscoped.where("#{column} = ? OR #{column} LIKE ?", normalized, wildcard)
+      base = "#{column} = ? OR #{column} LIKE ?"
+      # Awful hack for SQLite3, which does not pick up '\' as the escape character without this.
+      base << "ESCAPE '\\'" if sluggable.connection.adapter_name =~ /sqlite/i
+      scope = sluggable_class.unscoped.where(base, normalized, wildcard)
       scope = scope.where("#{pkey} <> ?", value) unless sluggable.new_record?
       # scope = scope.order("LENGTH(#{column}) DESC, #{column} DESC")
       scope = scope.order("LEN(#{column}) DESC, #{column} DESC")
@@ -58,7 +73,10 @@ module FriendlyId
     end
 
     def wildcard
-      "#{normalized}#{separator}%"
+      # Underscores (matching a single character) and percent signs (matching
+      # any number of characters) need to be escaped
+      # (While this seems like an excessive number of backslashes, it is correct)
+      "#{normalized}#{separator}".gsub(/[_%]/, '\\\\\&') + '%'
     end
   end
 end

@@ -3,13 +3,14 @@ module FriendlyId
 
 == Setting Up FriendlyId in Your Model
 
-To use FriendlyId in your ActiveRecord models, you must first extend the
-FriendlyId module, then invoke the {FriendlyId::Base#friendly_id friendly_id}
-method to configure your desired options:
+To use FriendlyId in your ActiveRecord models, you must first either extend or
+include the FriendlyId module (it makes no difference), then invoke the
+{FriendlyId::Base#friendly_id friendly_id} method to configure your desired
+options:
 
     class Foo < ActiveRecord::Base
-      extend FriendlyId
-      friendly_id bar, :use => [:slugged, :simple_i18n]
+      include FriendlyId
+      friendly_id :bar, :use => [:slugged, :simple_i18n]
     end
 
 The most important option is `:use`, which you use to tell FriendlyId which
@@ -129,10 +130,34 @@ often better and easier to use {FriendlyId::Slugged slugs}.
     #     end
     #   end
     #
-    # @option options [Symbol] :use The name of an addon to use. By default,
-    #   FriendlyId provides {FriendlyId::Slugged :slugged},
+    # === Including Your Own Modules
+    #
+    # Because :use can accept a name or a Module, {FriendlyId.defaults defaults}
+    # can be a convenient place to set up behavior common to all classes using
+    # FriendlyId. You can include any module, or more conveniently, define one
+    # on-the-fly. For example, let's say you want to make
+    # Babosa[http://github.com/norman/babosa] the default slugging library in
+    # place of Active Support, and transliterate all slugs from Russian Cyrillic
+    # to ASCII:
+    #
+    #   require "babosa"
+    #
+    #   FriendlyId.defaults do |config|
+    #     config.base = :name
+    #     config.use :slugged
+    #     config.use Module.new {
+    #       def normalize_friendly_id(text)
+    #         text.to_slug.normalize(:transliterations => [:russian, :latin])
+    #       end
+    #     }
+    #   end
+    #
+    #
+    # @option options [Symbol,Module] :use The addon or name of an addon to use.
+    #   By default, FriendlyId provides {FriendlyId::Slugged :slugged},
     #   {FriendlyId::History :history}, {FriendlyId::Reserved :reserved}, and
-    #   {FriendlyId::Scoped :scoped}.
+    #   {FriendlyId::Scoped :scoped}, {FriendlyId::SimpleI18n :simple_i18n},
+    #   and {FriendlyId::Globalize :globalize}.
     #
     # @option options [Array] :reserved_words Available when using +:reserved+,
     #   which is loaded by default. Sets an array of words banned for use as
@@ -161,21 +186,24 @@ often better and easier to use {FriendlyId::Slugged slugs}.
     #
     # @yieldparam config The model class's {FriendlyId::Configuration friendly_id_config}.
     def friendly_id(base = nil, options = {}, &block)
-      yield @friendly_id_config if block_given?
-      @friendly_id_config.use options.delete :use
-      @friendly_id_config.send :set, base ? options.merge(:base => base) : options
+      yield friendly_id_config if block_given?
+      friendly_id_config.use options.delete :use
+      friendly_id_config.send :set, base ? options.merge(:base => base) : options
       before_save {|rec| rec.instance_eval {@current_friendly_id = friendly_id}}
       include Model
     end
 
     # Returns the model class's {FriendlyId::Configuration friendly_id_config}.
     # @note In the case of Single Table Inheritance (STI), this method will
-    #   duplicate the parent class's FriendlyId::Configuration instance on first
-    #   access. If you're concerned about thread safety, then be sure to invoke
-    #   {#friendly_id} in your class for each model.
+    #   duplicate the parent class's FriendlyId::Configuration and relation class
+    #   on first access. If you're concerned about thread safety, then be sure
+    #   to invoke {#friendly_id} in your class for each model.
     def friendly_id_config
       @friendly_id_config or begin
-       @friendly_id_config = base_class.friendly_id_config.dup
+        @friendly_id_config = base_class.friendly_id_config.dup.tap do |config|
+          config.model_class = self
+          @relation_class = base_class.send(:relation_class)
+        end
       end
     end
 
@@ -238,7 +266,7 @@ often better and easier to use {FriendlyId::Slugged slugs}.
     # Either the friendly_id, or the numeric id cast to a string.
     def to_param
       if diff = changes[friendly_id_config.query_field]
-        diff.first
+        diff.first || diff.second
       else
         friendly_id.present? ? friendly_id : id.to_s
       end

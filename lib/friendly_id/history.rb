@@ -67,18 +67,22 @@ method.
           :class_name => Slug.to_s, :order => "#{Slug.quoted_table_name}.id DESC"
         after_save :create_slug
         relation_class.send :include, FinderMethods
+        friendly_id_config.slug_generator_class.send :include, SlugGenerator
       end
     end
 
     private
 
     def create_slug
+      return unless friendly_id
       return if slugs.first.try(:slug) == friendly_id
       # Allow reversion back to a previously used slug
       relation = slugs.where(:slug => friendly_id)
       result = relation.select("id").lock(true).all
       relation.delete_all unless result.empty?
-      slugs.create! :slug => friendly_id
+      slugs.create! do |record|
+        record.slug = friendly_id
+      end
     end
 
     # Adds a finder that explictly uses slugs from the slug table.
@@ -105,9 +109,27 @@ method.
       # Accepts a slug, and yields a corresponding sluggable_id into the block.
       def with_old_friendly_id(slug, &block)
         sql = "SELECT sluggable_id FROM #{Slug.quoted_table_name} WHERE sluggable_type = %s AND slug = %s"
-        sql = sql % [@klass.base_class.name, slug].map {|x| connection.quote(x)}
+        sql = sql % [@klass.base_class.to_s, slug].map {|x| connection.quote(x)}
         sluggable_id = connection.select_values(sql).first
         yield sluggable_id if sluggable_id
+      end
+    end
+
+    # This module overrides {FriendlyId::SlugGenerator#conflicts} to consider
+    # all historic slugs for that model.
+    module SlugGenerator
+
+      private
+
+      def conflicts
+        sluggable_class = friendly_id_config.model_class.base_class
+        pkey            = sluggable_class.primary_key
+        value           = sluggable.send pkey
+
+        scope = Slug.where("slug = ? OR slug LIKE ?", normalized, wildcard)
+        scope = scope.where(:sluggable_type => sluggable_class.to_s)
+        scope = scope.where("sluggable_id <> ?", value) unless sluggable.new_record?
+        scope.order("LENGTH(slug) DESC, slug DESC")
       end
     end
   end

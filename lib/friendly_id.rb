@@ -45,7 +45,7 @@ with numeric ids:
 module FriendlyId
 
   # The current version.
-  VERSION = "4.0.0"
+  VERSION = "4.0.6"
 
   @mutex = Mutex.new
 
@@ -54,6 +54,7 @@ module FriendlyId
   autoload :Reserved,   "friendly_id/reserved"
   autoload :Scoped,     "friendly_id/scoped"
   autoload :Slugged,    "friendly_id/slugged"
+  autoload :Globalize,  "friendly_id/globalize"
 
   # FriendlyId takes advantage of `extended` to do basic model setup, primarily
   # extending {FriendlyId::Base} to add {FriendlyId::Base#friendly_id
@@ -87,6 +88,11 @@ module FriendlyId
       @friendly_id_config = Class.new(Configuration).new(self)
       FriendlyId.defaults.call @friendly_id_config
     end
+  end
+
+  # Allow developers to `include` FriendlyId or `extend` it.
+  def self.included(model_class)
+    model_class.extend self
   end
 
   # Set global defaults for all models using FriendlyId.

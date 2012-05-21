@@ -1,7 +1,3 @@
-$: << File.expand_path("../../lib", __FILE__)
-$: << File.expand_path("../", __FILE__)
-$:.uniq!
-
 require "rubygems"
 require "bundler/setup"
 require "mocha"
@@ -50,15 +46,6 @@ module FriendlyId
         version = ActiveRecord::VERSION::STRING
         driver  = FriendlyId::Test::Database.driver
         engine  = RUBY_ENGINE rescue "ruby"
-
-        # This hack is needed to get AR 3.1 + JDBC to play nicely together
-        if version >= "3.1" && engine == "jruby"
-          if driver == "sqlite3"
-            puts "Skipping SQLite3 test on JRuby with AR 3.1; it doesn't currently work."
-            exit 0
-          end
-          config.each { |_, value| value["adapter"] = "jdbc" + value["adapter"].gsub(/2\z/, '') }
-        end
 
         ActiveRecord::Base.establish_connection config[driver]
         message = "Using #{engine} #{RUBY_VERSION} AR #{version} with #{driver}"

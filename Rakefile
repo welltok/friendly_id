@@ -3,7 +3,14 @@ require "rake/testtask"
 
 task :default => :test
 
+task :load_path do
+  %w(lib test).each do |path|
+    $LOAD_PATH.unshift(File.expand_path("../#{path}", __FILE__))
+  end
+end
+
 Rake::TestTask.new do |t|
+  t.libs << "test"
   t.test_files = FileList['test/*_test.rb']
   t.verbose = true
 end
@@ -21,7 +28,7 @@ task :yard => :guide do
   puts %x{bundle exec yard}
 end
 
-task :bench do
+task :bench => :load_path do
   require File.expand_path("../bench", __FILE__)
 end
 
@@ -40,6 +47,7 @@ task :guide do
   buffer << read_comments("lib/friendly_id/history.rb")
   buffer << read_comments("lib/friendly_id/scoped.rb")
   buffer << read_comments("lib/friendly_id/simple_i18n.rb")
+  buffer << read_comments("lib/friendly_id/globalize.rb")
   buffer << read_comments("lib/friendly_id/reserved.rb")
 
   File.open("Guide.rdoc", "w") do |file|
@@ -55,7 +63,7 @@ namespace :test do
     dir = File.expand_path("../test", __FILE__)
     Dir["#{dir}/*_test.rb"].each do |test|
       puts "Running #{test}:"
-      puts %x{ruby #{test}}
+      puts %x{ruby -Ilib -Itest #{test}}
     end
   end
 end
@@ -63,32 +71,32 @@ end
 namespace :db do
 
   desc "Create the database"
-  task :create do
-    require File.expand_path("../test/helper", __FILE__)
+  task :create => :load_path do
+    require "helper"
     driver = FriendlyId::Test::Database.driver
     config = FriendlyId::Test::Database.config[driver]
     commands = {
-      "mysql"    => "mysql -e 'create database #{config["database"]};' >/dev/null",
+      "mysql"    => "mysql -u #{config['username']} -e 'create database #{config["database"]};' >/dev/null",
       "postgres" => "psql -c 'create database #{config['database']};' -U #{config['username']} >/dev/null"
     }
     %x{#{commands[driver] || true}}
   end
 
   desc "Create the database"
-  task :drop do
-    require File.expand_path("../test/helper", __FILE__)
+  task :drop => :load_path do
+    require "helper"
     driver = FriendlyId::Test::Database.driver
     config = FriendlyId::Test::Database.config[driver]
     commands = {
-      "mysql"    => "mysql -e 'drop database #{config["database"]};' >/dev/null",
+      "mysql"    => "mysql -u #{config['username']} -e 'drop database #{config["database"]};' >/dev/null",
       "postgres" => "psql -c 'drop database #{config['database']};' -U #{config['username']} >/dev/null"
     }
     %x{#{commands[driver] || true}}
   end
 
   desc "Set up the database schema"
-  task :up do
-    require File.expand_path("../test/helper", __FILE__)
+  task :up => :load_path do
+    require "helper"
     FriendlyId::Test::Schema.up
   end
 
