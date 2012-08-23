@@ -11,7 +11,11 @@ end
 class GlobalizeTest < MiniTest::Unit::TestCase
   include FriendlyId::Test
 
-  test "friendly_id should find slug in current locale if locale is set, otherwise in default locale" do
+  def setup
+    I18n.locale = :en
+  end
+
+  test "should find slug in current locale if locale is set, otherwise in default locale" do
     transaction do
       I18n.default_locale = :en
       article_en = I18n.with_locale(:en) { TranslatedArticle.create(:title => 'a title') }
@@ -21,6 +25,17 @@ class GlobalizeTest < MiniTest::Unit::TestCase
         assert_equal TranslatedArticle.find("titel"), article_de
         assert_equal TranslatedArticle.find("a-title"), article_en
       }
+    end
+  end
+
+  test "should set friendly id for locale" do
+    transaction do
+      article = TranslatedArticle.create!(:title => "War and Peace")
+      article.set_friendly_id("Guerra y paz", :es)
+      article.save!
+      article = TranslatedArticle.find('war-and-peace')
+      I18n.with_locale(:es) { assert_equal "guerra-y-paz", article.friendly_id }
+      I18n.with_locale(:en) { assert_equal "war-and-peace", article.friendly_id }
     end
   end
 

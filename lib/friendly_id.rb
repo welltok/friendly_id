@@ -45,11 +45,12 @@ with numeric ids:
 module FriendlyId
 
   # The current version.
-  VERSION = "4.0.6"
+  VERSION = "4.0.8"
 
   @mutex = Mutex.new
 
   autoload :History,    "friendly_id/history"
+  autoload :Slug,       "friendly_id/slug"
   autoload :SimpleI18n, "friendly_id/simple_i18n"
   autoload :Reserved,   "friendly_id/reserved"
   autoload :Scoped,     "friendly_id/scoped"
