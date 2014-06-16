@@ -15,6 +15,8 @@ Gem::Specification.new do |s|
   s.test_files        = `git ls-files -- {test}/*`.split("\n")
   s.require_paths     = ["lib"]
 
+  s.metadata['allowed_push_host'] = 'https://gems.cafewelldev.com'
+
   s.add_development_dependency "railties", "~> 3.2.0"
   s.add_development_dependency "activerecord", "~> 3.2.0"
   s.add_development_dependency "minitest"
